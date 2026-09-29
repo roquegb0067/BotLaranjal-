@@ -2,6 +2,8 @@
 name = "transcrib_otto"
 version = "0.1.0"
 edition = "2021"
+
 [dependencies]
-transcribe-rs = "0.3"
+# CORRIGIDO: Adicionada a feature "onnx" para habilitar o SenseVoice
+transcribe-rs = { version = "0.3", features = ["whisper-cpp", "onnx"] }
 tokio = { version = "1.0", features = ["full"] }
