@@ -44,3 +44,9 @@ def analisar_com_gemini(prompt_texto):
 
     except Exception as e:
         return {'sucesso': False, 'erro': str(e)}
+# Guardando o resultado em uma variável
+resultado = analisar_com_gemini("Escreva um poema sobre inteligência artificial")
+
+# Exibindo o resultado na tela
+print(resultado)
+print(texto_resposta)
