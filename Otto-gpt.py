@@ -10,11 +10,11 @@ chave_api = os.getenv("OPENAI_API_KEY")
 # Ele busca automaticamente a variável "OPENAI_API_KEY" carregada do arquivo .env
 client = OpenAI()
 
-openai.api_key = chave_api
+OpenAI.api_key = chave_api
 
 def enviar_mensagem (mensagem):
 
-  resposta = openai.ChatCompletion.create(
+  resposta = OpenAI.ChatCompletion.create(
   
     model = "gpt-6-astra",
     
