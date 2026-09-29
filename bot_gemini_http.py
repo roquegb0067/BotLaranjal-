@@ -5,7 +5,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+texto = "O que acha de ser um robo Ottode assistente de IA para um projeto do colégio?"
 
+resposta = perguntar_gemini(texto)
 def perguntar_gemini(mensagem):
 
     if not GEMINI_API_KEY:
@@ -51,3 +53,4 @@ def perguntar_gemini(mensagem):
 
     except Exception as e:
         return f"Erro na API: {e}"
+print(resposta)
