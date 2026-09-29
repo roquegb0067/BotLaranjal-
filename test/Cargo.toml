@@ -4,6 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# CORRIGIDO: Adicionada a feature "onnx" para habilitar o SenseVoice
-transcribe-rs = { version = "0.3", features = ["whisper-cpp", "onnx"] }
+transcribe-rs = { version = "0.3", features = ["whisper-cpp"] }
 tokio = { version = "1.0", features = ["full"] }
