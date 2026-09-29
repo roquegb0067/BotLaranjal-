@@ -1,33 +1,9 @@
-import os
-from dotenv import load_dotenv
-from google import genai
+import whisper
 
-load_dotenv("kei.env")
+modelo whisper.load_model("tiny")
 
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
-)
+resposta = modelo.transcribe("Gravando.m4a")
 
-def transcrever_audio(caminho):
+I
 
-    arquivo = client.files.upload(
-        file=caminho
-    )
-
-    resposta = client.interactions.create(
-        model="gemini-3.5-transcribe",
-        input=[
-            {
-                "type": "audio",
-                "uri": arquivo.uri,
-                "mime_type": arquivo.mime_type
-            }
-        ]
-    )
-
-    return resposta.output_text
-
-
-texto = transcrever_audio("audio.wav")
-
-print(texto)
+print(resposta)
