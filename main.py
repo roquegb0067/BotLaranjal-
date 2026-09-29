@@ -29,25 +29,23 @@ with wave.open(wav_buffer, 'wb') as wf:
 
 wav_bytes = wav_buffer.getvalue()
 
-# 3. Inicializa o cliente definindo um timeout de 30 segundos
-# O http_options evita que a requisição fique presa para sempre se houver lentidão
+# Passa o timeout em segundos (ex: 60 segundos) ou remova o http_options para usar o padrão
 client = genai.Client(
-    http_options=types.HttpOptions(timeout=30000)
+    http_options=types.HttpOptions(timeout=60.0)
+)
+print("🚀 Enviando áudio para o Gemini (gemini-3.5-flash-lite)...")
+# Use o nome padrão do modelo flash leve:
+response = client.models.generate_content(
+    model='gemini-2.5-flash',  # Se preferir a versão padrão estável
+    contents=[
+        "Responda de forma direta e curta em português ao áudio a seguir:",
+        types.Part.from_bytes(
+            data=wav_bytes,
+            mime_type='audio/wav',
+        )
+    ]
 )
 
-print("🚀 Enviando áudio para o Gemini (gemini-3.5-flash-lite)...")
-
-try:
-    response = client.models.generate_content(
-        model='gemini-3.5-flash-lite',
-        contents=[
-            "Responda de forma direta e curta em português ao áudio a seguir:",
-            types.Part.from_bytes(
-                data=wav_bytes,
-                mime_type='audio/wav',
-            )
-        ]
-    )
 
     resposta_texto = response.text
     print(f"\n🤖 Resposta do Gemini: {resposta_texto}")
