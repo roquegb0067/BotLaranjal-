@@ -15,7 +15,7 @@ def perguntar_gemini(texto):
     api_key = gemini_key.strip()
     
     # Modelo oficial do Gemini (use gemini-1.5-flash ou gemini-2.0-flash)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     
     headers = {
         "Content-Type": "application/json"
