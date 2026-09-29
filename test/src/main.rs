@@ -1,5 +1,5 @@
 use transcribe_rs::{SpeechModel, TranscribeOptions};
-use transcribe_rs::whisper_cpp::WhisperModel;
+use transcribe_rs::WhisperModel;
 use std::path::PathBuf;
 
 #[tokio::main]
