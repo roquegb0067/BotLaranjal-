@@ -6,17 +6,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Correção: Adicionadas aspas para buscar a variável de ambiente
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Correção: Adicionadas aspas para definir a string de texto
 texto = "O que acha de ser um robo Otto de assistente de IA para um projeto do colégio?"
 
 def perguntar_gemini(texto):
-    if not GEMINI_API_KEY:
-        return "Erro: chave da API não configurada."
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if not gemini_key:
+        return {'sucesso': False, 'erro': 'GEMINI_API_KEY não configurada no kei.env'}
     
     # Correção: URL formatada como string única e com o modelo correto
-    url = "https://googleapis.com"
+    API_KEY = gemini_key.strip()
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={API_KEY}"
     
     # Correção: Adicionadas aspas em todas as chaves e valores do dicionário
     headers = {
