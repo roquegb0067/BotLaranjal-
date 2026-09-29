@@ -5,27 +5,22 @@ from dotenv import load_dotenv
 # Carrega as variáveis do arquivo .env
 load_dotenv()
 
-# Correção: Adicionadas aspas para buscar a variável de ambiente
-
-# Correção: Adicionadas aspas para definir a string de texto
 texto = "O que acha de ser um robo Otto de assistente de IA para um projeto do colégio?"
 
 def perguntar_gemini(texto):
     gemini_key = os.environ.get("GEMINI_API_KEY")
     if not gemini_key:
-        return {'sucesso': False, 'erro': 'GEMINI_API_KEY não configurada no kei.env'}
+        return {'sucesso': False, 'erro': 'GEMINI_API_KEY não configurada no arquivo .env'}
     
-    # Correção: URL formatada como string única e com o modelo correto
-    API_KEY = gemini_key.strip()
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={API_KEY}"
+    api_key = gemini_key.strip()
     
-    # Correção: Adicionadas aspas em todas as chaves e valores do dicionário
+    # Modelo oficial do Gemini (use gemini-1.5-flash ou gemini-2.0-flash)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
+    
     headers = {
-        "Content-Type": "application/json",
-        "x-goog-api-key": GEMINI_API_KEY.strip()
+        "Content-Type": "application/json"
     }
     
-    # Correção: Alterado 'mensagem' para 'texto' para bater com o parâmetro da função
     payload = {
         "contents": [
             {
@@ -43,11 +38,11 @@ def perguntar_gemini(texto):
         resposta.raise_for_status()
         dados = resposta.json()
         
-        # Correção: Adicionadas aspas para acessar as chaves do JSON retornado
+        # Extrai a resposta da API
         resultado = dados["candidates"][0]["content"]["parts"][0]["text"]
         return resultado
     except Exception as e:
         return f"Erro na API: {e}"
 
-# Correção: Chamando a função corretamente e passando a variável 'texto'
+# Executa e exibe o resultado
 print(perguntar_gemini(texto))
