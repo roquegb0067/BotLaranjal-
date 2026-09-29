@@ -15,7 +15,7 @@ SAMPLE_RATE = 48000
 DURATION = 5
 
 print("🎤 Fale algo! Gravando...")
-audio_data = sd.rec(int(DURATION * SAMPLE_RATE), samplerate=SAMPLE_RATE, channel>
+audio_data = sd.rec(int(DURATION * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1, dtype='int16')
 sd.wait()
 print("✅ Gravação concluída! Processando...")
 
@@ -30,7 +30,7 @@ with wave.open(wav_buffer, 'wb') as wf:
 wav_bytes = wav_buffer.getvalue()
 
 # 3. Inicializa o cliente definindo um timeout de 30 segundos
-# O http_options evita que a requisição fique presa para sempre se houver lentid>
+# O http_options evita que a requisição fique presa para sempre se houver lentidão
 client = genai.Client(
     http_options=types.HttpOptions(timeout=30000)
 )
