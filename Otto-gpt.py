@@ -26,7 +26,7 @@ def enviar_mensagem (mensagem):
   
   )
 
-return resposta ["choices"][0]["message"]
+  return resposta ["choices"][0]["message"]
 while True:
     texto = input("\nEscreva aqui sua mensagem (ou digite 'sair'): ")
     
