@@ -314,9 +314,11 @@ async def test_setup(websocket):
 
     try:
 
-        await websocket.send(
-            json.dumps(setup_message)
-        )
+        await websocket.send(json.dumps({
+              "realtimeInput": {
+                  "text": "Olá! Responda dizendo apenas: oi."
+              }
+          }))
 
         ok("Mensagem de setup enviada.")
 
