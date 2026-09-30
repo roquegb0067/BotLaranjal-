@@ -3,9 +3,13 @@ import websockets
 import json
 import base64
 import pyaudio
+import os
+API_KEY = os.environ.get("GEMINI_API_KEY")
 
-API_KEY = "YOUR_API_KEY"
-MODEL_NAME = "gemini-2.5-flash"  # Ou gemini-2.0-flash-exp / live
+if not API_KEY:
+    raise ValueError("A variável GEMINI_API_KEY não foi configurada!")
+
+MODEL_NAME = "gemini-3.8-live"
 WS_URL = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={API_KEY}"
 
 # Configurações de Áudio (Formatos padrão aceitos pelo Gemini)
