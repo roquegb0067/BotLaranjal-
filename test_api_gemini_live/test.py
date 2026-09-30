@@ -36,13 +36,14 @@ async def send_mic_audio(websocket):
 
     try:
         while True:
-            data = mic_stream.read(
+            data = await asyncio.to_thread(
+                mic_stream.read,
                 CHUNK_SIZE,
                 exception_on_overflow=False
             )
-    
+        
             encoded_data = base64.b64encode(data).decode("utf-8")
-    
+        
             audio_message = {
                 "realtimeInput": {
                     "mediaChunks": [
@@ -53,9 +54,9 @@ async def send_mic_audio(websocket):
                     ]
                 }
             }
-    
+        
             await websocket.send(json.dumps(audio_message))
-    
+            
     except asyncio.CancelledError:
         pass
     
