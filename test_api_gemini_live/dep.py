@@ -368,7 +368,7 @@ async def test_send_audio(websocket):
     mic_stream = p.open(
         format=FORMAT,
         channels=CHANNELS,
-        rate=RATE,
+        rate=INPUT_RATE,
         input=True,
         frames_per_buffer=CHUNK_SIZE
     )
@@ -397,8 +397,6 @@ async def test_send_audio(websocket):
 
             await websocket.send(json.dumps(audio_message))
 
-        # IMPORTANTE:
-        # informa ao Gemini que terminou o stream de fala
         await websocket.send(json.dumps({
             "realtimeInput": {
                 "audioStreamEnd": True
@@ -590,8 +588,6 @@ async def main():
     # PYAUDIO
     # --------------------------------------------------------
 
-    p = pyaudio.PyAudio()
-
     try:
 
         test_pyaudio_devices(p)
@@ -642,10 +638,6 @@ async def main():
         finally:
 
             await websocket.close()
-
-    finally:
-
-        p.terminate()
 
     section("DIAGNÓSTICO FINAL")
 
