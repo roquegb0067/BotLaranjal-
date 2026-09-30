@@ -80,7 +80,7 @@ async def receive_and_play_audio(websocket):
             model_turn = server_content.get("modelTurn", {})
             parts = model_turn.get("parts", [])
 
-             for part in parts:
+            for part in parts:
                 inline_data = part.get("inlineData", {})
                 if inline_data.get("mimeType", "").startswith("audio/pcm"):
                     # 1. Decodifica o Base64
@@ -95,8 +95,7 @@ async def receive_and_play_audio(websocket):
                     os.system("termux-media-player play temp_response.pcm")
 
     except asyncio.CancelledError:
-        pass # Nao precisa fechar o speaker_stream se nao tiver usando o PyAudio no out
-
+        pass  # Nao precisa fechar o speaker_stream se nao tiver usando o PyAudio no out
 
 # 3. LOOP PRINCIPAL
 async def main():
