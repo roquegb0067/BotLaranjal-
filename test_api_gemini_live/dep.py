@@ -398,154 +398,145 @@ async def listen_gemini(websocket, p):
 
     section("TESTE 8 — RESPOSTAS DO GEMINI")
 
-    speaker = None
+    speaker_stream = p.open(
+        format=pyaudio.paInt16,
+        channels=1,
+        rate=OUTPUT_RATE,
+        output=True,
+        frames_per_buffer=1024
+    )
+
+    audio_received = False
 
     try:
 
-        speaker = p.open(
-            format=FORMAT,
-            channels=1,
-            rate=OUTPUT_RATE,
-            output=True,
-            frames_per_buffer=1024
-        )
-
-        start = time.time()
-
-        audio_chunks = 0
-        audio_bytes_total = 0
-
-        while time.time() - start < 10:
+        while True:
 
             try:
-
                 message = await asyncio.wait_for(
                     websocket.recv(),
-                    timeout=2
+                    timeout=5
                 )
 
             except asyncio.TimeoutError:
-
-                info("Nenhuma mensagem nos últimos 2 segundos.")
-
+                info("5 segundos sem mensagem.")
                 continue
+
+            except Exception as e:
+                fail(f"WebSocket encerrado: {e}")
+                break
 
             response = json.loads(message)
 
-            print()
-            print("📩 Evento recebido:")
-            print(
-                json.dumps(
-                    response,
-                    indent=2,
-                    ensure_ascii=False
-                )
-            )
+            print("\n📩 EVENTO:")
+            print(json.dumps(
+                response,
+                indent=2,
+                ensure_ascii=False
+            ))
 
-            # ------------------------------------------------
+            # ==========================================
             # ERRO
-            # ------------------------------------------------
+            # ==========================================
 
             if "error" in response:
 
-                fail("GEMINI RETORNOU ERRO:")
+                fail("GEMINI RETORNOU ERRO")
 
-                print(
-                    json.dumps(
-                        response["error"],
-                        indent=2,
-                        ensure_ascii=False
-                    )
-                )
+                print(json.dumps(
+                    response["error"],
+                    indent=2,
+                    ensure_ascii=False
+                ))
 
-            # ------------------------------------------------
+                break
+
+            # ==========================================
             # SERVER CONTENT
-            # ------------------------------------------------
+            # ==========================================
 
-            server_content = response.get(
-                "serverContent",
-                {}
-            )
+            if "serverContent" in response:
 
-            model_turn = server_content.get(
-                "modelTurn",
-                {}
-            )
+                server_content = response["serverContent"]
 
-            parts = model_turn.get(
-                "parts",
-                []
-            )
+                print("🧠 SERVER CONTENT RECEBIDO")
 
-            for part in parts:
+                # --------------------------------------
+                # MODEL TURN
+                # --------------------------------------
 
-                inline = part.get(
-                    "inlineData",
+                model_turn = server_content.get(
+                    "modelTurn",
                     {}
                 )
 
-                mime = inline.get(
-                    "mimeType",
-                    ""
+                parts = model_turn.get(
+                    "parts",
+                    []
                 )
 
-                if mime.startswith("audio/pcm"):
+                for part in parts:
 
-                    audio_chunks += 1
+                    print("📦 PART:")
+                    print(json.dumps(
+                        part,
+                        indent=2,
+                        ensure_ascii=False
+                    ))
 
-                    audio = base64.b64decode(
-                        inline["data"]
+                    inline_data = part.get(
+                        "inlineData"
                     )
 
-                    audio_bytes_total += len(audio)
+                    if not inline_data:
+                        continue
 
-                    print(
-                        f"🔊 ÁUDIO RECEBIDO "
-                        f"#{audio_chunks}: "
-                        f"{len(audio)} bytes"
+                    mime_type = inline_data.get(
+                        "mimeType",
+                        ""
                     )
 
-                    speaker.write(audio)
+                    if mime_type.startswith("audio/pcm"):
 
-        print()
+                        audio_bytes = base64.b64decode(
+                            inline_data["data"]
+                        )
 
-        if audio_chunks == 0:
+                        print(
+                            f"🔊 ÁUDIO RECEBIDO: "
+                            f"{len(audio_bytes)} bytes"
+                        )
 
-            fail(
-                "Nenhum chunk de áudio recebido "
-                "do Gemini."
-            )
+                        speaker_stream.write(
+                            audio_bytes
+                        )
 
-            return False
+                        audio_received = True
 
-        ok(
-            f"Total de chunks: {audio_chunks}"
-        )
+                # --------------------------------------
+                # TURN COMPLETE
+                # --------------------------------------
 
-        ok(
-            f"Total de bytes: {audio_bytes_total}"
-        )
+                if server_content.get(
+                    "turnComplete"
+                ):
 
-        return True
+                    print("✅ TURN COMPLETE")
 
-    except Exception as e:
-
-        fail(
-            f"Erro recebendo resposta: {e}"
-        )
-
-        traceback.print_exc()
-
-        return False
+                    break
 
     finally:
 
-        if speaker:
+        speaker_stream.stop_stream()
+        speaker_stream.close()
 
-            speaker.stop_stream()
-            speaker.close()
+    if audio_received:
 
+        print("\n🎉 Gemini enviou áudio!")
 
+    else:
+
+        print("\n❌ Nenhum áudio recebido.")
 # ============================================================
 # MAIN
 # ============================================================
