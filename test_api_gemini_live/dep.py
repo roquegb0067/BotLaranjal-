@@ -626,7 +626,7 @@ async def main():
 
             await test_send_audio(
                 websocket,
-                p
+              
             )
 
             # ------------------------------------------------
