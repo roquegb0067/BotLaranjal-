@@ -4,28 +4,31 @@ import json
 import base64
 import pyaudio
 import os
+import struct
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
 if not API_KEY:
     raise ValueError("A variável GEMINI_API_KEY não foi configurada!")
 
-# Modelo correto para a API Live (Bidi WebSocket)
-MODEL_NAME = "gemini-3.8-live"
+MODEL_NAME = "gemini-2.0-flash-exp"
 WS_URL = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={API_KEY}"
 
 # Configurações de Áudio
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
-INPUT_RATE = 16000      # Entrada exige 16kHz
-OUTPUT_RATE = 24000     # Saída do Gemini é 24kHz
+INPUT_RATE = 16000      # 16kHz Entrada
+OUTPUT_RATE = 24000     # 24kHz Saída
 CHUNK_SIZE = 1024
 
-# Inicializa o PyAudio
+# Sensibilidade do Microfone (Ajuste se necessário)
+SILENCE_THRESHOLD = 600   # Volume mínimo para considerar fala (picos de 0 a 32767)
+SILENCE_SECONDS = 1.0     # Quantos segundos de silêncio acionam a resposta do Gemini
+
 p = pyaudio.PyAudio()
 
 
-# 1. FUNÇÃO PARA GRAVAR O MICROFONE E ENVIAR CONTINUAMENTE
+# 1. GRAVAÇÃO E ENVIO COM DETECÇÃO DE SILÊNCIO
 async def send_mic_audio(websocket):
     mic_stream = p.open(
         format=FORMAT,
@@ -34,19 +37,34 @@ async def send_mic_audio(websocket):
         input=True,
         frames_per_buffer=CHUNK_SIZE
     )
-    print("🎤 Microfone ativo! Pode falar...")
+    
+    print("\n🎤 Microfone ativo! Pode falar...")
+
+    user_is_speaking = False
+    silence_chunks = 0
+    max_silence_chunks = int((INPUT_RATE / CHUNK_SIZE) * SILENCE_SECONDS)
 
     try:
         while True:
-            # Leitura do microfone fora do loop principal para não travar o asyncio
             data = await asyncio.to_thread(
                 mic_stream.read,
                 CHUNK_SIZE,
                 exception_on_overflow=False
             )
 
-            encoded_data = base64.b64encode(data).decode("utf-8")
+            # Calcula o pico do volume do bloco atual
+            samples = struct.unpack("<" + "h" * (len(data) // 2), data)
+            peak = max(abs(x) for x in samples)
 
+            # Se o volume for maior que o threshold, o usuário está falando
+            if peak > SILENCE_THRESHOLD:
+                if not user_is_speaking:
+                    print("🗣️  Voz detectada... enviando áudio.")
+                    user_is_speaking = True
+                silence_chunks = 0
+
+            # Prepara a mensagem de áudio
+            encoded_data = base64.b64encode(data).decode("utf-8")
             audio_message = {
                 "realtimeInput": {
                     "mediaChunks": [
@@ -58,7 +76,28 @@ async def send_mic_audio(websocket):
                 }
             }
 
-            await websocket.send(json.dumps(audio_message))
+            # Se estiver falando ou no período de tolerância de silêncio, envia
+            if user_is_speaking:
+                await websocket.send(json.dumps(audio_message))
+
+                if peak <= SILENCE_THRESHOLD:
+                    silence_chunks += 1
+
+                # Detectou fim da fala (silêncio prolongado)
+                if silence_chunks >= max_silence_chunks:
+                    print("⏳ Pausa detectada. Solicitando resposta ao Gemini...\n")
+                    
+                    # Notifica a API que a fala terminou
+                    turn_complete_message = {
+                        "clientContent": {
+                            "turnComplete": True
+                        }
+                    }
+                    await websocket.send(json.dumps(turn_complete_message))
+                    
+                    user_is_speaking = False
+                    silence_chunks = 0
+
             await asyncio.sleep(0.001)
 
     except asyncio.CancelledError:
@@ -68,7 +107,7 @@ async def send_mic_audio(websocket):
         mic_stream.close()
 
 
-# 2. FUNÇÃO PARA RECEBER E REPRODUZIR O ÁUDIO DO GEMINI
+# 2. RECEBIMENTO E REPRODUÇÃO
 async def receive_and_play_audio(websocket):
     speaker_stream = p.open(
         format=FORMAT,
@@ -78,14 +117,12 @@ async def receive_and_play_audio(websocket):
         frames_per_buffer=1024
     )
 
-    print("🔊 Alto-falante pronto...")
-
     try:
         async for message in websocket:
             response = json.loads(message)
 
             if "error" in response:
-                print(f"\n❌ Erro retornado pelo Gemini: {response['error']}")
+                print(f"❌ Erro do Gemini: {response['error']}")
                 break
 
             server_content = response.get("serverContent", {})
@@ -97,11 +134,10 @@ async def receive_and_play_audio(websocket):
 
                 if inline_data.get("mimeType", "").startswith("audio/pcm"):
                     audio_bytes = base64.b64decode(inline_data["data"])
-                    # Reprodução não-bloqueante para evitar gargalos na rede
                     await asyncio.to_thread(speaker_stream.write, audio_bytes)
 
             if server_content.get("turnComplete"):
-                print("\n✅ Gemini concluiu a resposta.")
+                print("✅ Gemini terminou de responder. Pode falar novamente!\n")
 
     except asyncio.CancelledError:
         pass
@@ -110,12 +146,12 @@ async def receive_and_play_audio(websocket):
         speaker_stream.close()
 
 
-# 3. MAIN (CONEXÃO E ORQUESTRAÇÃO)
+# 3. MAIN
 async def main():
     async with websockets.connect(WS_URL) as websocket:
-        print("🔗 WebSocket conectado com sucesso!")
+        print("🔗 Conectado ao Gemini Live!")
 
-        # Handshake inicial / Configuração do modelo
+        # Handshake de Setup
         setup_message = {
             "setup": {
                 "model": f"models/{MODEL_NAME}",
@@ -126,20 +162,20 @@ async def main():
         }
         await websocket.send(json.dumps(setup_message))
 
-        # Aguarda a confirmação de Handshake
-        first_response = await websocket.recv()
-        setup_ack = json.loads(first_response)
+        # Aguarda confirmação do Gemini
+        first_msg = await websocket.recv()
+        ack = json.loads(first_msg)
 
-        if "setupComplete" in setup_ack:
-            print("✅ Handshake concluído. Inicializando áudio...\n")
+        if "setupComplete" in ack:
+            print("✅ Setup concluído com sucesso!")
         else:
-            print("⚠️ Resposta do setup:", setup_ack)
+            print("⚠️ Setup retornou:", ack)
 
-        # Inicia captura e reprodução simultaneamente
+        # Executa envio e recebimento concorrentemente
         send_task = asyncio.create_task(send_mic_audio(websocket))
-        receive_task = asyncio.create_task(receive_and_play_audio(websocket))
+        recv_task = asyncio.create_task(receive_and_play_audio(websocket))
 
-        await asyncio.gather(send_task, receive_task)
+        await asyncio.gather(send_task, recv_task)
 
 
 if __name__ == "__main__":
