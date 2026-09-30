@@ -17,7 +17,8 @@ p = pyaudio.PyAudio()
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
-MODEL_NAME = "gemini-3.8-live"
+#MODEL_NAME = "gemini-3.8-live"
+MODEL_NAME = "gemini-2.0-flash-exp"
 
 WS_URL = (
     "wss://generativelanguage.googleapis.com/"
@@ -358,6 +359,7 @@ async def test_send_audio(websocket):
     print("🎤 Fale alguma coisa durante os próximos 3 segundos...")
 
     try:
+        # Envia ~3 segundos de áudio
         for _ in range(46):
             data = await asyncio.to_thread(
                 mic_stream.read,
@@ -367,29 +369,34 @@ async def test_send_audio(websocket):
 
             encoded_data = base64.b64encode(data).decode("utf-8")
 
+            # Estrutura correta: mediaChunks (array)
             audio_message = {
                 "realtimeInput": {
-                    "audio": {
-                        "data": encoded_data,
-                        "mimeType": "audio/pcm;rate=16000"
-                    }
+                    "mediaChunks": [
+                        {
+                            "data": encoded_data,
+                            "mimeType": "audio/pcm;rate=16000"
+                        }
+                    ]
                 }
             }
 
             await websocket.send(json.dumps(audio_message))
 
-        await websocket.send(json.dumps({
-            "realtimeInput": {
-                "audioStreamEnd": True
+        # Sinaliza explicitamente ao Gemini que a fala terminou
+        end_turn_message = {
+            "clientContent": {
+                "turnComplete": True
             }
-        }))
+        }
+        await websocket.send(json.dumps(end_turn_message))
 
-        print("✅ 46 chunks enviados.")
-        print("✅ audioStreamEnd enviado.")
+        print("✅ 46 chunks e sinal de 'turnComplete' enviados com sucesso.")
 
     finally:
         mic_stream.stop_stream()
         mic_stream.close()
+
 # ============================================================
 # TESTE 8 — ESCUTAR GEMINI
 # ============================================================
