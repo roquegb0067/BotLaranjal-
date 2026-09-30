@@ -17,8 +17,7 @@ p = pyaudio.PyAudio()
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
-#MODEL_NAME = "gemini-3.8-live"
-MODEL_NAME = "gemini-2.0-flash-exp"
+MODEL_NAME = "gemini-3.8-live"
 
 WS_URL = (
     "wss://generativelanguage.googleapis.com/"
