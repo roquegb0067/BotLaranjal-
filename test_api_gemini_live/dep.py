@@ -363,88 +363,53 @@ async def test_setup(websocket):
 # TESTE 7 — ENVIO DE ÁUDIO
 # ============================================================
 
-async def test_send_audio(websocket, p):
+async def test_send_audio(websocket):
+    mic_stream = p.open(
+        format=FORMAT,
+        channels=CHANNELS,
+        rate=RATE,
+        input=True,
+        frames_per_buffer=CHUNK_SIZE
+    )
 
-    section("TESTE 7 — ENVIO DE ÁUDIO")
-
-    stream = None
+    print("✅ Microfone aberto para teste Live.")
+    print("🎤 Fale alguma coisa durante os próximos 3 segundos...")
 
     try:
-
-        stream = p.open(
-            format=FORMAT,
-            channels=CHANNELS,
-            rate=INPUT_RATE,
-            input=True,
-            frames_per_buffer=CHUNK_SIZE
-        )
-
-        ok("Microfone aberto para teste Live.")
-
-        print("🎤 Enviando aproximadamente 3 segundos...")
-
-        start = time.time()
-
-        chunks = 0
-
-        while time.time() - start < 3:
-
+        for _ in range(46):
             data = await asyncio.to_thread(
-                stream.read,
+                mic_stream.read,
                 CHUNK_SIZE,
                 exception_on_overflow=False
             )
 
-            encoded = base64.b64encode(
-                data
-            ).decode("utf-8")
+            encoded_data = base64.b64encode(data).decode("utf-8")
 
-            message = {
-
+            audio_message = {
                 "realtimeInput": {
-
-                    "mediaChunks": [
-
-                        {
-
-                            "data": encoded,
-
-                            "mimeType":
-                                "audio/pcm;rate=16000"
-
-                        }
-
-                    ]
-
+                    "audio": {
+                        "data": encoded_data,
+                        "mimeType": "audio/pcm;rate=16000"
+                    }
                 }
-
             }
 
-            await websocket.send(
-                json.dumps(message)
-            )
+            await websocket.send(json.dumps(audio_message))
 
-            chunks += 1
+        # IMPORTANTE:
+        # informa ao Gemini que terminou o stream de fala
+        await websocket.send(json.dumps({
+            "realtimeInput": {
+                "audioStreamEnd": True
+            }
+        }))
 
-        ok(f"{chunks} chunks enviados.")
-
-        return True
-
-    except Exception as e:
-
-        fail(f"Erro enviando áudio: {e}")
-        traceback.print_exc()
-
-        return False
+        print("✅ 46 chunks enviados.")
+        print("✅ audioStreamEnd enviado.")
 
     finally:
-
-        if stream:
-
-            stream.stop_stream()
-            stream.close()
-
-
+        mic_stream.stop_stream()
+        mic_stream.close()
 # ============================================================
 # TESTE 8 — ESCUTAR GEMINI
 # ============================================================
