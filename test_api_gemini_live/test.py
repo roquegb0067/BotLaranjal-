@@ -76,17 +76,23 @@ async def receive_and_play_audio(websocket):
             model_turn = server_content.get("modelTurn", {})
             parts = model_turn.get("parts", [])
 
-            for part in parts:
+                        for part in parts:
                 inline_data = part.get("inlineData", {})
                 if inline_data.get("mimeType", "").startswith("audio/pcm"):
-                    # Decodifica o Base64 de volta para bytes brutos PCM
+                    # 1. Decodifica o Base64
                     audio_bytes = base64.b64decode(inline_data["data"])
-                    # Reproduz o som na caixa de som
-                    speaker_stream.write(audio_bytes)
+                    
+                    # 2. Salva os bytes num arquivo temporario
+                    with open("temp_response.pcm", "wb") as f:
+                        f.write(audio_bytes)
+                    
+                    # 3. Manda o Android tocar o arquivo (vai direto pro fone Bluetooth)
+                    import os
+                    os.system("termux-media-player play temp_response.pcm")
 
     except asyncio.CancelledError:
-        speaker_stream.stop_stream()
-        speaker_stream.close()
+        pass # Nao precisa fechar o speaker_stream se nao tiver usando o PyAudio no out
+
 
 # 3. LOOP PRINCIPAL
 async def main():

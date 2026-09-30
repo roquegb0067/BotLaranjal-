@@ -51,18 +51,7 @@ async def send_audio_chunk(websocket, chunk_bytes):
 # await send_audio_chunk(websocket, chunk)
 
 # Inside the websocket context
-async def send_audio_chunk(websocket, chunk_bytes):
-    import base64
-    encoded_data = base64.b64encode(chunk_bytes).decode('utf-8')
-    audio_message = {
-        "realtimeInput": {
-            "audio": {
-                "data": encoded_data,
-                "mimeType": "audio/pcm;rate=16000"
-            }
-        }
-    }
-    await websocket.send(json.dumps(audio_message))
+
     # print("Sent audio chunk") # Avoid excessive logging
 
 # Assuming 'chunk' is your raw PCM audio bytes
