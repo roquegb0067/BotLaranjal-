@@ -2,13 +2,14 @@ import asyncio
 import websockets
 import json
 import base64
-import pyaudio
 import os
 import struct
 import math
 import time
 import traceback
+import pyaudio
 
+p = pyaudio.PyAudio()
 
 # ============================================================
 # CONFIGURAÇÃO
@@ -673,18 +674,12 @@ async def main():
 # ============================================================
 
 if __name__ == "__main__":
-
     try:
-
         asyncio.run(main())
-
     except KeyboardInterrupt:
-
-        print()
-        print("🛑 Diagnóstico interrompido.")
-
-    except Exception as e:
-
+        print("\n🛑 Encerrado pelo usuário.")
+    finally:
+        p.terminate()
         print()
         print("💥 ERRO FATAL:")
         traceback.print_exc()
