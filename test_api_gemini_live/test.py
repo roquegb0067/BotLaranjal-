@@ -73,32 +73,29 @@ async def receive_and_play_audio(websocket):
     print("🔊 Alto-falante pronto...")
 
     try:
-        async for message in websocket:
-            response = json.loads(message)
+    async for message in websocket:
+        response = json.loads(message)
 
-            # Verifica se na resposta há partes contendo dados de áudio
-            server_content = response.get("serverContent", {})
-            model_turn = server_content.get("modelTurn", {})
-            parts = model_turn.get("parts", [])
+        server_content = response.get("serverContent", {})
+        model_turn = server_content.get("modelTurn", {})
+        parts = model_turn.get("parts", [])
 
-            for part in parts:
-                inline_data = part.get("inlineData", {})
-                if inline_data.get("mimeType", "").startswith("audio/pcm"):
-                    # 1. Decodifica o Base64
-                    audio_bytes = base64.b64decode(inline_data["data"])
-                    
-                    # 2. Salva os bytes num arquivo temporario
-                    
-                    with wave.open("temp_response.wav", "wb") as wav_file:
-                        wav_file.setnchannels(1)        # Mono
-                        wav_file.setsampwidth(2)        # 16-bit (2 bytes)
-                        wav_file.setframerate(24000)    # 24kHz
-                        wav_file.writeframes(audio_bytes)
-                    os.system("termux-media-player play temp_response.wav")
+        for part in parts:
+            inline_data = part.get("inlineData", {})
 
-    except asyncio.CancelledError:
-        pass  # Nao precisa fechar o speaker_stream se nao tiver usando o PyAudio no out
+            if inline_data.get("mimeType", "").startswith("audio/pcm"):
+                audio_bytes = base64.b64decode(
+                    inline_data["data"]
+                )
 
+                speaker_stream.write(audio_bytes)
+
+except asyncio.CancelledError:
+    pass
+
+finally:
+    speaker_stream.stop_stream()
+    speaker_stream.close()
 # 3. LOOP PRINCIPAL
 async def main():
     async with websockets.connect(WS_URL) as websocket:
