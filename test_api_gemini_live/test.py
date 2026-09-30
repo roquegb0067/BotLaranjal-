@@ -80,7 +80,7 @@ async def receive_and_play_audio(websocket):
             model_turn = server_content.get("modelTurn", {})
             parts = model_turn.get("parts", [])
 
-                        for part in parts:
+             for part in parts:
                 inline_data = part.get("inlineData", {})
                 if inline_data.get("mimeType", "").startswith("audio/pcm"):
                     # 1. Decodifica o Base64
