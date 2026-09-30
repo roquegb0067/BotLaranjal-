@@ -78,7 +78,9 @@ async def receive_and_play_audio(websocket):
     try:
         async for message in websocket:
             response = json.loads(message)
-
+        
+            print("📩 Gemini:", response.keys())
+        
             server_content = response.get("serverContent", {})
             model_turn = server_content.get("modelTurn", {})
             parts = model_turn.get("parts", [])
@@ -87,10 +89,14 @@ async def receive_and_play_audio(websocket):
                 inline_data = part.get("inlineData", {})
 
                 if inline_data.get("mimeType", "").startswith("audio/pcm"):
+                    print("🔊 ÁUDIO RECEBIDO!")
+                
                     audio_bytes = base64.b64decode(
                         inline_data["data"]
                     )
-
+                
+                    print(f"📦 Bytes recebidos: {len(audio_bytes)}")
+                
                     speaker_stream.write(audio_bytes)
 
     except asyncio.CancelledError:
