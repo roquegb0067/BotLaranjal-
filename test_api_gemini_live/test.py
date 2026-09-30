@@ -37,64 +37,93 @@ async def send_mic_audio(websocket):
         input=True,
         frames_per_buffer=CHUNK_SIZE
     )
-    
+
     print("\n🎤 Microfone ativo! Pode falar...")
 
     user_is_speaking = False
     silence_chunks = 0
-    max_silence_chunks = int((INPUT_RATE / CHUNK_SIZE) * SILENCE_SECONDS)
+
+    max_silence_chunks = int(
+        (INPUT_RATE / CHUNK_SIZE) * SILENCE_SECONDS
+    )
 
     try:
         while True:
+
             data = await asyncio.to_thread(
                 mic_stream.read,
                 CHUNK_SIZE,
                 exception_on_overflow=False
             )
 
-            # Calcula o pico do volume do bloco atual
-            samples = struct.unpack("<" + "h" * (len(data) // 2), data)
+            samples = struct.unpack(
+                "<" + "h" * (len(data) // 2),
+                data
+            )
+
             peak = max(abs(x) for x in samples)
 
-            # Se o volume for maior que o threshold, o usuário está falando
+            # ==========================================
+            # USUÁRIO COMEÇOU A FALAR
+            # ==========================================
+
             if peak > SILENCE_THRESHOLD:
+
                 if not user_is_speaking:
-                    print("🗣️  Voz detectada... enviando áudio.")
+                    print("🗣️ Voz detectada...")
                     user_is_speaking = True
+
                 silence_chunks = 0
 
-            # Prepara a mensagem de áudio
-            encoded_data = base64.b64encode(data).decode("utf-8")
-            audio_message = {
-                "realtimeInput": {
-                    "mediaChunks": [
-                        {
+            # ==========================================
+            # SE ESTÁ FALANDO, ENVIA ÁUDIO
+            # ==========================================
+
+            if user_is_speaking:
+
+                encoded_data = base64.b64encode(
+                    data
+                ).decode("utf-8")
+
+                audio_message = {
+                    "realtimeInput": {
+                        "audio": {
                             "data": encoded_data,
                             "mimeType": "audio/pcm;rate=16000"
                         }
-                    ]
+                    }
                 }
-            }
 
-            # Se estiver falando ou no período de tolerância de silêncio, envia
-            if user_is_speaking:
-                await websocket.send(json.dumps(audio_message))
+                await websocket.send(
+                    json.dumps(audio_message)
+                )
+
+                # --------------------------------------
+                # SILÊNCIO DURANTE A FALA
+                # --------------------------------------
 
                 if peak <= SILENCE_THRESHOLD:
                     silence_chunks += 1
 
-                # Detectou fim da fala (silêncio prolongado)
+                # --------------------------------------
+                # FIM DA FALA
+                # --------------------------------------
+
                 if silence_chunks >= max_silence_chunks:
-                    print("⏳ Pausa detectada. Solicitando resposta ao Gemini...\n")
-                    
-                    # Notifica a API que a fala terminou
-                    turn_complete_message = {
-                        "clientContent": {
-                            "turnComplete": True
-                        }
-                    }
-                    await websocket.send(json.dumps(turn_complete_message))
-                    
+
+                    print(
+                        "⏳ Fim da fala → "
+                        "audioStreamEnd"
+                    )
+
+                    await websocket.send(
+                        json.dumps({
+                            "realtimeInput": {
+                                "audioStreamEnd": True
+                            }
+                        })
+                    )
+
                     user_is_speaking = False
                     silence_chunks = 0
 
@@ -102,11 +131,10 @@ async def send_mic_audio(websocket):
 
     except asyncio.CancelledError:
         pass
+
     finally:
         mic_stream.stop_stream()
         mic_stream.close()
-
-
 # 2. RECEBIMENTO E REPRODUÇÃO
 async def receive_and_play_audio(websocket):
     speaker_stream = p.open(
