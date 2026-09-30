@@ -151,12 +151,19 @@ async def main():
     async with websockets.connect(WS_URL) as websocket:
         print("🔗 Conectado ao Gemini Live!")
 
-        # Handshake de Setup
+        # Handshake de Setup com instrução em Português
         setup_message = {
             "setup": {
                 "model": f"models/{MODEL_NAME}",
                 "generationConfig": {
                     "responseModalities": ["AUDIO"]
+                },
+                "systemInstruction": {
+                    "parts": [
+                        {
+                            "text": "Você é um assistente conversacional em tempo real. Responda SEMPRE em Português do Brasil (pt-BR). Use frases curtas, tom natural, direto e expressivo."
+                        }
+                    ]
                 }
             }
         }
@@ -176,7 +183,6 @@ async def main():
         recv_task = asyncio.create_task(receive_and_play_audio(websocket))
 
         await asyncio.gather(send_task, recv_task)
-
 
 if __name__ == "__main__":
     try:
