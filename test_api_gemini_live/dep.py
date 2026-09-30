@@ -639,6 +639,8 @@ async def main():
 
             await websocket.close()
 
+    finally:
+        p.terminate()
     section("DIAGNÓSTICO FINAL")
 
     print()
