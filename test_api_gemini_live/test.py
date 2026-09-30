@@ -4,6 +4,7 @@ import json
 import base64
 import pyaudio
 import os
+import wave
 API_KEY = os.environ.get("GEMINI_API_KEY")
 
 if not API_KEY:
@@ -87,12 +88,13 @@ async def receive_and_play_audio(websocket):
                     audio_bytes = base64.b64decode(inline_data["data"])
                     
                     # 2. Salva os bytes num arquivo temporario
-                    with open("temp_response.pcm", "wb") as f:
-                        f.write(audio_bytes)
                     
-                    # 3. Manda o Android tocar o arquivo (vai direto pro fone Bluetooth)
-                    import os
-                    os.system("termux-media-player play temp_response.pcm")
+                    with wave.open("temp_response.wav", "wb") as wav_file:
+                        wav_file.setnchannels(1)        # Mono
+                        wav_file.setsampwidth(2)        # 16-bit (2 bytes)
+                        wav_file.setframerate(24000)    # 24kHz
+                        wav_file.writeframes(audio_bytes)
+                    os.system("termux-media-player play temp_response.wav")
 
     except asyncio.CancelledError:
         pass  # Nao precisa fechar o speaker_stream se nao tiver usando o PyAudio no out
