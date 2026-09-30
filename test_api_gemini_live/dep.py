@@ -295,34 +295,22 @@ async def test_setup(websocket):
     section("TESTE 6 — SETUP GEMINI")
 
     setup_message = {
-
         "setup": {
-
             "model": f"models/{MODEL_NAME}",
-
             "generationConfig": {
-
                 "responseModalities": [
                     "AUDIO"
                 ]
-
             }
-
         }
-
     }
 
     try:
-
-        await websocket.send(json.dumps({
-              "realtimeInput": {
-                  "text": "Olá! Responda dizendo apenas: oi."
-              }
-          }))
+        # PRIMEIRO FRAME: obrigatoriamente setup
+        await websocket.send(json.dumps(setup_message))
 
         ok("Mensagem de setup enviada.")
 
-        # Espera resposta
         message = await asyncio.wait_for(
             websocket.recv(),
             timeout=10
@@ -339,29 +327,20 @@ async def test_setup(websocket):
         )
 
         if "setupComplete" in response:
-
             ok("Gemini confirmou setup.")
-
             return True
 
         if "error" in response:
-
             fail("Gemini retornou erro.")
-
             return False
 
         info("Resposta inesperada.")
-
         return True
 
     except Exception as e:
-
         fail(f"Erro no setup: {e}")
         traceback.print_exc()
-
         return False
-
-
 # ============================================================
 # TESTE 7 — ENVIO DE ÁUDIO
 # ============================================================
