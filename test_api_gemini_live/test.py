@@ -36,13 +36,13 @@ async def send_mic_audio(websocket):
 
     try:
         while True:
-            # Lê os bytes brutos (PCM) do microfone de forma não-bloqueante
-            data = mic_stream.read(CHUNK_SIZE, exception_on_overflow=False)
-            
-            # Codifica em Base64
-            encoded_data = base64.b64encode(data).decode('utf-8')
-            
-            # Monta a estrutura JSON da API
+            data = mic_stream.read(
+                CHUNK_SIZE,
+                exception_on_overflow=False
+            )
+    
+            encoded_data = base64.b64encode(data).decode("utf-8")
+    
             audio_message = {
                 "realtimeInput": {
                     "mediaChunks": [
@@ -53,50 +53,51 @@ async def send_mic_audio(websocket):
                     ]
                 }
             }
-            # Envia pelo WebSocket
+    
             await websocket.send(json.dumps(audio_message))
-            await asyncio.sleep(0.001) # Cede tempo para o loop assíncrono
-            
+    
     except asyncio.CancelledError:
+        pass
+    
+    finally:
         mic_stream.stop_stream()
         mic_stream.close()
-
 # 2. FUNÇÃO PARA RECEBER E REPRODUZIR O ÁUDIO DO GEMINI
 async def receive_and_play_audio(websocket):
-    # Abre o fluxo de saída (Alto-falantes / Fone)
     speaker_stream = p.open(
-        format=FORMAT,
-        channels=CHANNELS,
-        rate=24000, # O Gemini costuma retornar áudio sintetizado em 24kHz
-        output=True
+        format=pyaudio.paInt16,
+        channels=1,
+        rate=24000,
+        output=True,
+        frames_per_buffer=1024
     )
+
     print("🔊 Alto-falante pronto...")
 
     try:
-    async for message in websocket:
-        response = json.loads(message)
+        async for message in websocket:
+            response = json.loads(message)
 
-        server_content = response.get("serverContent", {})
-        model_turn = server_content.get("modelTurn", {})
-        parts = model_turn.get("parts", [])
+            server_content = response.get("serverContent", {})
+            model_turn = server_content.get("modelTurn", {})
+            parts = model_turn.get("parts", [])
 
-        for part in parts:
-            inline_data = part.get("inlineData", {})
+            for part in parts:
+                inline_data = part.get("inlineData", {})
 
-            if inline_data.get("mimeType", "").startswith("audio/pcm"):
-                audio_bytes = base64.b64decode(
-                    inline_data["data"]
-                )
+                if inline_data.get("mimeType", "").startswith("audio/pcm"):
+                    audio_bytes = base64.b64decode(
+                        inline_data["data"]
+                    )
 
-                speaker_stream.write(audio_bytes)
+                    speaker_stream.write(audio_bytes)
 
-except asyncio.CancelledError:
-    pass
+    except asyncio.CancelledError:
+        pass
 
-finally:
-    speaker_stream.stop_stream()
-    speaker_stream.close()
-# 3. LOOP PRINCIPAL
+    finally:
+        speaker_stream.stop_stream()
+        speaker_stream.close()
 async def main():
     async with websockets.connect(WS_URL) as websocket:
         print("WebSocket Conectado com Sucesso!")
