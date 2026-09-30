@@ -11,7 +11,7 @@ API_KEY = os.environ.get("GEMINI_API_KEY")
 if not API_KEY:
     raise ValueError("A variável GEMINI_API_KEY não foi configurada!")
 
-MODEL_NAME = "gemini-2.0-flash-exp"
+MODEL_NAME = "gemini-3.8-live"
 WS_URL = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={API_KEY}"
 
 # Configurações de Áudio
