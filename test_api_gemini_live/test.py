@@ -79,7 +79,7 @@ async def receive_and_play_audio(websocket):
         async for message in websocket:
             response = json.loads(message)
         
-            print("📩 Gemini:", response.keys())
+            print("📩 Gemini:", json.dumps(response, indent=2))
         
             server_content = response.get("serverContent", {})
             model_turn = server_content.get("modelTurn", {})
