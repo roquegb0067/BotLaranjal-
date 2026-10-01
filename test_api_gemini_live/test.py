@@ -189,7 +189,7 @@ async def main():
                 "systemInstruction": {
                     "parts": [
                         {
-                            "text": "Você é um assistente conversacional em tempo real. Responda SEMPRE em Português do Brasil (pt-BR). Use frases curtas, tom natural, direto e expressivo."
+                            "text": "Você é um assistente conversacional em tempo real. Responda SEMPRE em Português do Brasil (pt-BR). Use frases curtas, tom natural, direto e expressivo. Seu nome será Otto e você é de um projeto de escola."
                         }
                     ]
                 }
