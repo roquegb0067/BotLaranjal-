@@ -106,26 +106,30 @@ async function initAudio() {
     websocket = new WebSocket(WS_URL);
 
     websocket.onopen = () => {
-        console.log('WebSocket conectado diretamente ao Gemini!');
-        startBtn.innerText = "Conectado e Ouvindo...";
+  console.log("WebSocket conectado diretamente ao Gemini!");
 
-        // Envia a mensagem inicial de configuração (Setup) conforme o protocolo da API
-        const setupMessage = {
-            setup: {
-                model: MODEL_NAME,
-                generationConfig: {
-                    responseModalities: ['AUDIO']
-                },
-                systemInstruction: {
-                    parts: [{ text: 'Você é um assistente prestativo. Responda em português de forma sucinta.' }]
-                }
+  // 1. Envie OBRIGATORIAMENTE o payload de setup primeiro
+  const setupPayload = {
+    setup: {
+      model: "models/gemini-2.0-flash-exp",
+      generationConfig: {
+        responseModalities: ["AUDIO"], // ou ["TEXT"]
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: "Puck" // Opções: Puck, Charon, Kore, Fenrir, Aoede
             }
-        };
-        websocket.send(JSON.stringify(setupMessage));
-        
-        // Inicia a gravação do áudio do microfone
-        startMicrophone();
-    };
+          }
+        }
+      }
+    }
+  };
+
+  websocket.send(JSON.stringify(setupPayload));
+
+  // 2. Só então inicie a captura do microfone
+  startMicrophone();
+};
 
     websocket.onmessage = async (event) => {
         let response;
