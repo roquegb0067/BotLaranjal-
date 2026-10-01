@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Gemini Live API - Audio Visualizer</title>
+    <style>
+        body {
+            background-color: #0d0f12;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: sans-serif;
+        }
+
+        #circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: #00ffd5;
+            box-shadow: 0 0 20px rgba(0, 255, 213, 0.8);
+            transition: transform 0.05s ease, box-shadow 0.05s ease;
+            margin-bottom: 40px;
+        }
+
+        #visualizer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            height: 100px;
+        }
+
+        .bar {
+            width: 6px;
+            height: 100%;
+            background: linear-gradient(180deg, #ff00c8, #00ffd5);
+            border-radius: 3px;
+            transform: scaleY(0.05);
+            transform-origin: bottom;
+            transition: transform 0.05s linear;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #00ffd5;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <button id="startBtn">Iniciar Conversa com Gemini</button>
+    <div id="circle"></div>
+    <div id="visualizer"></div>
+
+<script>
+const API_KEY = "SUA_API_KEY_AQUI"; // Substitua pela sua chave da API do Google AI
+const MODEL_NAME = "models/gemini-2.0-flash-exp"; // Modelo compatível com Bidi/Live API
+const WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${API_KEY}`;
+
+const visualizer = document.getElementById('visualizer');
+const circle = document.getElementById('circle');
+const startBtn = document.getElementById('startBtn');
+
+const totalBars = 64;
+const bars = [];
+
+// Criar as barras do visualizador no DOM
+for (let i = 0; i < totalBars; i++) {
+    const bar = document.createElement('div');
+    bar.classList.add('bar');
+    visualizer.appendChild(bar);
+    bars.push(bar);
+}
+
+let audioCtx;
+let analyser;
+let dataArray;
+let websocket;
+let nextStartTime = 0;
+
+startBtn.addEventListener('click', initAudio);
+
+async function initAudio() {
+    startBtn.disabled = true;
+    startBtn.innerText = "Conectando...";
+
+    // 1. Inicializa o AudioContext para reprodução do áudio retornado (24kHz padrão do Gemini)
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+    
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = totalBars * 2;
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    analyser.connect(audioCtx.destination);
+
+    // 2. Conecta diretamente à WebSocket da API do Gemini
+    websocket = new WebSocket(WS_URL);
+
+    websocket.onopen = () => {
+        console.log('WebSocket conectado diretamente ao Gemini!');
+        startBtn.innerText = "Conectado e Ouvindo...";
+
+        // Envia a mensagem inicial de configuração (Setup) conforme o protocolo da API
+        const setupMessage = {
+            setup: {
+                model: MODEL_NAME,
+                generationConfig: {
+                    responseModalities: ['AUDIO']
+                },
+                systemInstruction: {
+                    parts: [{ text: 'Você é um assistente prestativo. Responda em português de forma sucinta.' }]
+                }
+            }
+        };
+        websocket.send(JSON.stringify(setupMessage));
+        
+        // Inicia a gravação do áudio do microfone
+        startMicrophone();
+    };
+
+    websocket.onmessage = async (event) => {
+        let response;
+        if (event.data instanceof Blob) {
+            response = JSON.parse(await event.data.text());
+        } else {
+            response = JSON.parse(event.data);
+        }
+
+        // Processa partes do áudio retornado pelo modelo
+        if (response.serverContent?.modelTurn?.parts) {
+            for (const part of response.serverContent.modelTurn.parts) {
+                if (part.inlineData && part.inlineData.data) {
+                    playPCMChunk(part.inlineData.data);
+                }
+            }
+        }
+    };
+
+    websocket.onerror = (error) => console.error('Erro na WebSocket:', error);
+    websocket.onclose = () => {
+        console.log('WebSocket Fechado');
+        startBtn.disabled = false;
+        startBtn.innerText = "Iniciar Conversa com Gemini";
+    };
+
+    // Inicia o loop de animação do visualizador
+    animate();
+}
+
+// Captura áudio do microfone e envia em tempo real para a WebSocket
+async function startMicrophone() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const micContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        
+        const source = micContext.createMediaStreamSource(stream);
+        const processor = micContext.createScriptProcessor(2048, 1, 1);
+
+        processor.onaudioprocess = (e) => {
+            if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
+
+            const inputData = e.inputBuffer.getChannelData(0);
+            const int16Array = new Int16Array(inputData.length);
+            
+            // Converte Float32 para Int16 PCM (16-bit)
+            for (let i = 0; i < inputData.length; i++) {
+                int16Array[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
+            }
+
+            // Converte array buffer para Base64
+            let binary = '';
+            const bytes = new Uint8Array(int16Array.buffer);
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            const base64Audio = btoa(binary);
+
+            // Payload exigido pela Live API para envio de áudio em tempo real
+            const realtimeMessage = {
+                realtimeInput: {
+                    mediaChunks: [
+                        {
+                            mimeType: "audio/pcm;rate=16000",
+                            data: base64Audio
+                        }
+                    ]
+                }
+            };
+
+            websocket.send(JSON.stringify(realtimeMessage));
+        };
+
+        source.connect(processor);
+        processor.connect(micContext.destination); // Necessário para acionar a gravação no browser
+    } catch (err) {
+        console.error("Erro ao acessar o microfone:", err);
+    }
+}
+
+// Reproduz pedaços de áudio PCM (24kHz Int16) recebidos do Gemini
+function playPCMChunk(base64Data) {
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const int16Array = new Int16Array(bytes.buffer);
+    const float32Array = new Float32Array(int16Array.length);
+    
+    // Converte de Int16 para Float32 exigido pelo Web Audio API
+    for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / 32768.0;
+    }
+
+    // O Gemini responde em PCM 24000Hz mono
+    const buffer = audioCtx.createBuffer(1, float32Array.length, 24000);
+    buffer.getChannelData(0).set(float32Array);
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    
+    // Conecta a fonte ao Analyser antes da saída de áudio
+    source.connect(analyser);
+
+    // Enfileiramento contínuo sem cortes no som
+    const currentTime = audioCtx.currentTime;
+    if (nextStartTime < currentTime) {
+        nextStartTime = currentTime;
+    }
+    source.start(nextStartTime);
+    nextStartTime += buffer.duration;
+}
+
+// Animação das barras e do círculo com base nas frequências de áudio tocadas
+function animate() {
+    requestAnimationFrame(animate);
+    if (!analyser) return;
+
+    analyser.getByteFrequencyData(dataArray);
+    const centerIndex = (totalBars - 1) / 2;
+
+    // Atualiza barras de frequência
+    for (let i = 0; i < totalBars; i++) {
+        const distanceFromCenter = Math.abs(i - centerIndex);
+        const freqIndex = Math.floor(distanceFromCenter);
+        const frequencyValue = dataArray[freqIndex] || 0;
+        const scaleY = Math.max(0.05, frequencyValue / 255);
+        bars[i].style.transform = `scaleY(${scaleY})`;
+    }
+
+    // Calcula graves para o brilho do círculo
+    let bassSum = 0;
+    for (let i = 0; i < 8; i++) {
+        bassSum += dataArray[i];
+    }
+    const bassAvg = bassSum / 8;
+
+    if (circle) {
+        const circleScale = 1 + (bassAvg / 255) * 0.45;
+        const glowRadius = 20 + (bassAvg / 255) * 60;
+        circle.style.transform = `scale(${circleScale})`;
+        circle.style.boxShadow = `0 0 ${glowRadius}px rgba(0, 255, 213, 0.8), 0 0 ${glowRadius * 1.5}px rgba(255, 0, 200, 0.6)`;
+    }
+}
+</script>
+</body>
+</html>

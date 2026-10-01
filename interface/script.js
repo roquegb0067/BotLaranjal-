@@ -1,9 +1,47 @@
-const visualizer = document.getElementById('visualizer');
-const circle = document.getElementById('circle');
+const API_KEY = "YOUR_API_KEY";
+const MODEL_NAME = "gemini-3.8-live";
+const WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${API_KEY}`;
 
-const totalBars = 64;
+const websocket = new WebSocket(WS_URL);
+
+websocket.onopen = () => {
+  console.log('WebSocket Connected');
+
+  // 1. Send the initial configuration
+  const setupMessage = {
+    setup: {
+      model: `models/${MODEL_NAME}`,
+      responseModalities: ['AUDIO'],
+      systemInstruction: {
+        parts: [{ text: 'You are a helpful assistant.' }]
+      }
+    }
+  };
+  websocket.send(JSON.stringify(setupMessage));
+  console.log('Configuration sent');
+};
+
+websocket.onmessage = (event) => {
+  const response = JSON.parse(event.data);
+  console.log('Received:', response);
+  // Handle different types of responses here
+};
+
+websocket.onerror = (error) => {
+  console.error('WebSocket Error:', error);
+};
+
+websocket.onclose = () => {
+  console.log('WebSocket Closed');
+};
+const audio = document.getElementById('audio');
+const visualizer = document.getElementById('visualizer');
+
+// Define quantas barras queres (por ex., 32 barras)
+const totalBars = 64; 
 const bars = [];
 
+// Criar as barras dinamicamente no DOM
 for (let i = 0; i < totalBars; i++) {
     const bar = document.createElement('div');
     bar.classList.add('bar');
@@ -11,131 +49,82 @@ for (let i = 0; i < totalBars; i++) {
     bars.push(bar);
 }
 
-let audioCtx;
-let analyser;
-let dataArray;
-let ws;
-let nextStartTime = 0;
+let audioCtx, analyser, dataArray;
 
-document.body.addEventListener('click', initAudio, { once: true });
+audio.addEventListener('play', () => {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioCtx.createMediaElementSource(audio);
+        
+        analyser = audioCtx.createAnalyser();
+        // fftSize de 64 gera 32 canais de frequência (64 / 2 = 32)
+        analyser.fftSize = totalBars * 2; 
 
-async function initAudio() {
-    audioCtx = new(window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = totalBars * 2;
-    dataArray = new Uint8Array(analyser.frequencyBinCount);
-    
-    analyser.connect(audioCtx.destination);
-    
-    ws = new WebSocket('ws://127.0.0.1:8765');
-    
-    ws.onopen = () => {
-        console.log("WebSocket conectado! Ligando microfone...");
-        startMicrophone();
-    };
-    
-    ws.onmessage = async (event) => {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'audio') {
-            playPCMChunk(msg.data);
-        }
-    };
+        source.connect(analyser);
+        analyser.connect(audioCtx.destination);
+
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+    }
     
     animate();
-}
-
-async function startMicrophone() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const micContext = new(window.AudioContext || window.webkitAudioContext)();
-        const actualSampleRate = micContext.sampleRate; // Pega a taxa real do hardware
-        
-        const source = micContext.createMediaStreamSource(stream);
-        const processor = micContext.createScriptProcessor(2048, 1, 1);
-        
-        processor.onaudioprocess = (e) => {
-            if (!ws || ws.readyState !== WebSocket.OPEN) return;
-            
-            const inputData = e.inputBuffer.getChannelData(0);
-            const int16Array = new Int16Array(inputData.length);
-            for (let i = 0; i < inputData.length; i++) {
-                int16Array[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
-            }
-            
-            let binary = '';
-            const bytes = new Uint8Array(int16Array.buffer);
-            for (let i = 0; i < bytes.byteLength; i++) {
-                binary += String.fromCharCode(bytes[i]);
-            }
-            const base64Audio = btoa(binary);
-            
-            ws.send(JSON.stringify({
-                type: 'audio',
-                data: base64Audio,
-                sampleRate: actualSampleRate
-            }));
-        };
-        
-        source.connect(processor);
-        // Desconectado do micContext.destination para evitar retorno da sua própria voz nos alto-falantes
-    } catch (err) {
-        console.error("Erro ao acessar o microfone:", err);
-    }
-}
-
-function playPCMChunk(base64Data) {
-    const binaryString = atob(base64Data);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    
-    const int16Array = new Int16Array(bytes.buffer);
-    const float32Array = new Float32Array(int16Array.length);
-    for (let i = 0; i < int16Array.length; i++) {
-        float32Array[i] = int16Array[i] / 32768.0;
-    }
-    
-    const buffer = audioCtx.createBuffer(1, float32Array.length, 24000);
-    buffer.getChannelData(0).set(float32Array);
-    
-    const source = audioCtx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(analyser);
-    
-    const currentTime = audioCtx.currentTime;
-    if (nextStartTime < currentTime) {
-        nextStartTime = currentTime;
-    }
-    source.start(nextStartTime);
-    nextStartTime += buffer.duration;
-}
+});
 
 function animate() {
-    requestAnimationFrame(animate);
-    if (!analyser) return;
-    
+    if (audio.paused) {
+        bars.forEach(bar => bar.style.transform = 'scaleY(0.05)');
+        return;
+    }
+
     analyser.getByteFrequencyData(dataArray);
+
     const centerIndex = (totalBars - 1) / 2;
-    
+
     for (let i = 0; i < totalBars; i++) {
+        // 1. Calcula a distância da barra atual até ao centro
         const distanceFromCenter = Math.abs(i - centerIndex);
+        
+        // 2. Mapeia essa distância para o índice de frequência (0 = graves no centro)
         const freqIndex = Math.floor(distanceFromCenter);
-        const frequencyValue = dataArray[freqIndex] || 0;
+        
+        // 3. Obtém a frequência correspondente
+        const frequencyValue = dataArray[freqIndex] || 0; // Valor de 0 a 255
+        
+        // 4. Aplica a escala vertical
         const scaleY = Math.max(0.05, frequencyValue / 255);
+        
         bars[i].style.transform = `scaleY(${scaleY})`;
     }
-    
-    let bassSum = 0;
-    for (let i = 0; i < 8; i++) {
-        bassSum += dataArray[i];
-    }
-    const bassAvg = bassSum / 8;
-    
-    if (circle) {
-        const circleScale = 1 + (bassAvg / 255) * 0.45;
-        const glowRadius = 20 + (bassAvg / 255) * 60;
-        circle.style.transform = `scale(${circleScale})`;
-        circle.style.boxShadow = `0 0 ${glowRadius}px rgba(0, 255, 213, 0.8), 0 0 ${glowRadius * 1.5}px rgba(255, 0, 200, 0.6)`;
-    }
+
+    requestAnimationFrame(animate);
 }
+websocket.onmessage = (event) => {
+  const response = JSON.parse(event.data);
+  console.log('Received:', response);
+
+  if (response.serverContent) {
+    const serverContent = response.serverContent;
+    // Receiving Audio
+    if (serverContent.modelTurn?.parts) {
+      for (const part of serverContent.modelTurn.parts) {
+        if (part.inlineData) {
+          const audioData = part.inlineData.data; // Base64 encoded string
+          // Process or play audioData
+          console.log(`Received audio data (base64 len: ${audioData.length})`);
+        }
+      }
+    }
+
+    // Receiving Text Transcriptions
+    if (serverContent.inputTranscription) {
+      console.log('User:', serverContent.inputTranscription.text);
+    }
+    if (serverContent.outputTranscription) {
+      console.log('Gemini:', serverContent.outputTranscription.text);
+    }
+  }
+
+  // Handling Tool Calls
+  if (response.toolCall) {
+    handleToolCall(response.toolCall);
+  }
+};
