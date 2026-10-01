@@ -46,12 +46,27 @@ async def bridge_handler(frontend_ws):
         await gemini_ws.recv() # Aguarda confirmação do Gemini
 
         # 1. Frontend -> Gemini (Envia microfone do navegador)
-        async def forward_frontend_to_gemini():
+        # 1. Frontend -> Gemini (Recebe áudio do navegador e formata para o Gemini)
+async def forward_frontend_to_gemini():
+    try:
+        async for message in frontend_ws:
             try:
-                async for message in frontend_ws:
-                    await gemini_ws.send(message)
-            except websockets.ConnectionClosed:
+                msg_data = json.loads(message)
+                if msg_data.get("type") == "audio":
+                    # Formato exigido pela API do Gemini Live WebSocket
+                    realtime_payload = {
+                        "realtimeInput": {
+                            "mediaChunks": [{
+                                "mimeType": "audio/pcm;rate=16000",
+                                "data": msg_data["data"]
+                            }]
+                        }
+                    }
+                    await gemini_ws.send(json.dumps(realtime_payload))
+            except json.JSONDecodeError:
                 pass
+    except websockets.ConnectionClosed:
+        pass
 
         # 2. Gemini -> Frontend (Envia resposta em áudio para o navegador)
         async def forward_gemini_to_frontend():
