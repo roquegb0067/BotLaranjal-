@@ -1,0 +1,89 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #09090b;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Container central organizador */
+.visualizer-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: 650px;
+  height: 300px;
+}
+
+/* Círculo interativo reagente às frequências graves */
+.glow-circle {
+  position: absolute;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, #ff007f, #7a00ff, #00ffd5);
+  background-size: 200% 200%;
+  box-shadow: 0 0 25px rgba(122, 0, 255, 0.6), 0 0 50px rgba(255, 0, 127, 0.4);
+  transition: transform 0.05s ease-out, box-shadow 0.05s ease-out;
+  z-index: 1;
+}
+
+/* Brilho neon animado ao redor do círculo */
+.glow-circle::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
+  background-size: 400% 400%;
+  filter: blur(12px);
+  opacity: 0.75;
+  z-index: -1;
+  animation: glowing 15s linear infinite;
+}
+
+@keyframes glowing {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Barras do visualizador */
+#visualizer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 220px;
+  width: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.bar {
+  width: 5px;
+  height: 100%;
+  background: linear-gradient(180deg, #ff00c8, #FF8F00);
+  border-radius: 4px;
+  transform-origin: center;
+  transform: scaleY(0.05);
+  transition: transform 0.04s ease;
+}
+
+audio {
+  z-index: 10;
+  accent-color: #7a00ff;
+}
