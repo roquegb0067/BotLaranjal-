@@ -1,18 +1,17 @@
 import asyncio
 import websockets
 import json
-import base64
 import os
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
 if not API_KEY:
     raise ValueError("A variável GEMINI_API_KEY não foi configurada!")
 
-
 MODEL_NAME = "gemini-3.8-live"
 GEMINI_WS_URL = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={API_KEY}"
 
 async def process_request(connection, request):
+    # Se NÃO for uma requisição WebSocket, entrega o arquivo HTML
     if request.headers.get("Upgrade", "").lower() != "websocket":
         try:
             with open("index.html", "rb") as f:
@@ -94,7 +93,7 @@ async def bridge_handler(frontend_ws):
         print(f"❌ Erro na conexão com o Gemini: {e}")
 
 async def main():
-    print("🚀 Servidor Bridge rodando em ws://127.0.0.1:8765")
+    print("🚀 Servidor Bridge rodando em http://127.0.0.1:8765")
     async with websockets.serve(
         bridge_handler, 
         "0.0.0.0", 
@@ -104,4 +103,7 @@ async def main():
         await asyncio.Future()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n🛑 Servidor encerrado com sucesso!")
