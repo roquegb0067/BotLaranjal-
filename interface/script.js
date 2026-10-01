@@ -20,7 +20,6 @@ let nextStartTime = 0;
 document.body.addEventListener('click', initAudio, { once: true });
 
 async function initAudio() {
-    // AudioContext com suporte a entrada e saída
     audioCtx = new(window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = totalBars * 2;
@@ -28,7 +27,6 @@ async function initAudio() {
     
     analyser.connect(audioCtx.destination);
     
-    // Conecta ao servidor Python usando o IP direto 127.0.0.1
     ws = new WebSocket('ws://127.0.0.1:8765');
     
     ws.onopen = () => {
@@ -46,15 +44,15 @@ async function initAudio() {
     animate();
 }
 
-// Captura o microfone e envia pacotes PCM 16kHz
 async function startMicrophone() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1 } });
-        const micContext = new(window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const micContext = new(window.AudioContext || window.webkitAudioContext)();
+        const actualSampleRate = micContext.sampleRate; // Pega a taxa real do hardware
+        
         const source = micContext.createMediaStreamSource(stream);
         const processor = micContext.createScriptProcessor(2048, 1, 1);
         
-        // Substitua o envio dentro do onaudioprocess por JSON.stringify puro:
         processor.onaudioprocess = (e) => {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             
@@ -71,16 +69,15 @@ async function startMicrophone() {
             }
             const base64Audio = btoa(binary);
             
-            // Envia o áudio limpo em JSON
             ws.send(JSON.stringify({
                 type: 'audio',
-                data: base64Audio
+                data: base64Audio,
+                sampleRate: actualSampleRate
             }));
         };
         
-        
         source.connect(processor);
-        processor.connect(micContext.destination);
+        // Desconectado do micContext.destination para evitar retorno da sua própria voz nos alto-falantes
     } catch (err) {
         console.error("Erro ao acessar o microfone:", err);
     }
